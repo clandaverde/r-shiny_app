@@ -259,17 +259,17 @@ server <- function(input, output) {
     
   }
   
-  plot_pca <- function(data, title="") {
-    pca_result <- prcomp(t(data), center = TRUE)
+  #plot_pca <- function(data, title="") {
+    #pca_result <- prcomp(t(data), center = TRUE)
     
     # in the pac_result i will access the component that the user specifies
-    pca_data <- data.frame(PC1 = pca_result$x[, 1], PC2 = pca_result$x[, 2])
+    #pca_data <- data.frame(PC1 = pca_result$x[, 1], PC2 = pca_result$x[, 2])
     
-    pca_plot <- ggplot(data = pca_data, aes(x = PC1, y = PC2, color=timepoint)) +
-      geom_point() +
-      labs(title = title, x = "PC1: 75% Variance", y = "PC2: 15% Variance")
+    #pca_plot <- ggplot(data = pca_data, aes(x = PC1, y = PC2, color=timepoint)) +
+      #geom_point() +
+      #labs(title = title, x = "PC1: 75% Variance", y = "PC2: 15% Variance")
     
-    return(pca_plot)
+    #return(pca_plot)
   }
   
     
