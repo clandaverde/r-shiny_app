@@ -16,6 +16,8 @@ library(colourpicker) # you might need to install this
 library(DT)
 library(matrixStats)
 library(gplots)
+library(heatmap3)
+
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -55,7 +57,11 @@ ui <- fluidPage(
                      tabPanel("Summary", DTOutput("Csummary")),
                      tabPanel("Diagnostic Plots", plotOutput("CDiagplot1"), plotOutput("CDiagplot2")),
                      tabPanel("Heatmap", plotOutput("Cheatmap")),
-                     tabPanel("PCA", plotOutput("CPCA"))
+                     tabPanel("PCA", selectInput("PCAX", "Select PCA for x axis",
+                                                 choices = c('PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC5', 'PC6', 'PC7', 'PC8', 'PC9', 'PC10', 'PC11', 'PC12', 'PC13', 'PC14', 'PC15')),
+                                      selectInput("PCAY", "Select PCA for y axis",
+                                                  choices = c('PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC5', 'PC6', 'PC7', 'PC8', 'PC9', 'PC10', 'PC11', 'PC12', 'PC13', 'PC14', 'PC15')),
+                              plotOutput("CPCA"))
                     )
                   )
                 )
@@ -63,7 +69,7 @@ ui <- fluidPage(
         tabPanel("Diff. Expr.",
                  sidebarLayout(
                    sidebarPanel(
-                     fileInput("DiffFile", paste0("Load differential expression results"), accept = c('text/csv', 'text/comma-separated-values',
+                     fileInput("DiffFile", paste0("Load differential expression results CSV"), accept = c('text/csv', 'text/comma-separated-values',
                                                                                                   'text/tab-separated-values','text/plain', 'csv','tsv')),
                      HTML(paste(rep('<p>A volcano plot can be generated with <b>"log2 fold"</b> change on the x-axis and <b>"p-adjusted"</b> on the y-axis.</p>'), collapse = "")),
                      radioButtons("DiffButtonx", "Choose the column for the x-axis",
@@ -83,19 +89,34 @@ ui <- fluidPage(
                        tabPanel("Table", DTOutput("Dtable")),
                        tabPanel("Volcano plot", plotOutput("Dvolcano")),
                        tabPanel("Plot table", DTOutput("DPlottable"))
+                      )
+                    )
+                  )
+        ),
+        tabPanel("Indv. Gene Expr.",
+                 sidebarLayout(
+                   sidebarPanel(
+                     fileInput("icountMatrix", paste0("Load normalized counts matrix CSV"), accept = c('text/csv', 'text/comma-separated-values',
+                                                                                                      'text/tab-separated-values','text/plain', 'csv','tsv')),
+                     fileInput("imetadata", paste0("Load sample information matrix CSV"), accept = c('text/csv', 'text/comma-separated-values',
+                                                                                                   'text/tab-separated-values','text/plain', 'csv','tsv')),
+                     selectInput("metacategory", "Select metadata category", choices = c("Sample.ID", "PMI", "Age.of.Death", "RIN", 'mRNA.Seq.reads')),
+                     textInput("geneSearch", "Enter a gene to search for. (ex. ENSG00000000419.8 or )")
+                   ),
+                   
+                   mainPanel(
+                     plotOutput("IndGeneScatPlot")
+
                    )
                  )
-
-                 )
-        ),
-        tabPanel("Indiv. Gene Expr.")
+        )
       )
     )
 
 
 # Define server logic required to draw a histogram
 options(shiny.maxRequestSize=30*1024^2)
-server <- function(input, output) {
+server <- function(input, output, session) {
   
   #SAMPLES
   # loads in the metadata for use in the Samples tab
@@ -117,6 +138,7 @@ server <- function(input, output) {
   output$Stable <- renderDT({
     #browser()
     file <- sample_load_data()
+    print(file)
   })
   # outputs a summary table of the metadata into the Samples > Summary tab
   output$Ssummary <- renderDT({
@@ -172,12 +194,14 @@ server <- function(input, output) {
   
   # filtering variance and non zero genes
   filter_zero_var_genes <- function(verse_counts, button_variance, button_nonzero, num_samples, num_genes) {
-    #browser()
     # Compute variance for each gene
     variance <- apply(verse_counts[, -1], 1, var)
+    #browser()
+    
+    req_perc <- quantile(variance, button_variance/100)
     
     # Filter genes based on variance and non-zero criteria
-    filter_variance <- variance > button_variance
+    filter_variance <- variance > req_perc
     nonzero <- rowSums(verse_counts[, -1] > 0) 
     filter_nonzero <- nonzero > button_nonzero
     filtered_genes <- which(filter_variance & filter_nonzero)
@@ -209,7 +233,9 @@ server <- function(input, output) {
     vector_variance <- apply(data[,-1], 1, var, na.rm = TRUE)
     df_data <- data.frame(Median_count = median_val, Variance = vector_variance)
     
-    df_data$PassThreshold <- df_data$Variance > input$countsVariance
+    req_perc <- quantile(vector_variance, input$countsVariance/100)
+    
+    df_data$PassThreshold <- df_data$Variance > req_perc
     
     custom_colors <- c("FALSE" = "red", "TRUE" = "black")
     
@@ -233,6 +259,7 @@ server <- function(input, output) {
     # Count the number of zeros in each row
     num_zeros <- rowSums(data[,-1] == 0, na.rm = TRUE)
     
+    
     log_med <- log2(median_val + 1)
     log_zero <- log2(num_zeros + 1)
     
@@ -252,24 +279,32 @@ server <- function(input, output) {
   
   
   counts_heatmap <- function(data, filtered_counts, button_variance, button_nonzero) {
+    #browser()
     subset_counts <- filtered_counts[,-1]
     counts_matrix <- as.matrix(subset_counts)
     counts_matrix_log <- log2(counts_matrix + 1)
-    heatmap.2(counts_matrix_log)
+    heatmap.2(counts_matrix_log, dendrogram = 'none', trace = 'none')
     
   }
   
-  #plot_pca <- function(data, title="") {
-    #pca_result <- prcomp(t(data), center = TRUE)
+  plot_pca <- function(c_data, title="") {
+    #browser()
+    counts_no_gene <- c_data[,-1]
+    #vector_variance <- apply(data[,-1], 1, var, na.rm = TRUE)
+    #req_perc <- quantile(vector_variance, input$countsVariance/100)
     
-    # in the pac_result i will access the component that the user specifies
-    #pca_data <- data.frame(PC1 = pca_result$x[, 1], PC2 = pca_result$x[, 2])
+    pca_result <- prcomp(t(counts_no_gene), center = TRUE)
     
-    #pca_plot <- ggplot(data = pca_data, aes(x = PC1, y = PC2, color=timepoint)) +
-      #geom_point() +
-      #labs(title = title, x = "PC1: 75% Variance", y = "PC2: 15% Variance")
+    pca_data <- data.frame(PC1 = pca_result$x[, 1], PC2 = pca_result$x[, 2], PC3 = pca_result$x[, 3], PC4 = pca_result$x[, 4],
+                           PC5 = pca_result$x[, 5], PC6 = pca_result$x[, 6], PC7 = pca_result$x[, 7], PC8 = pca_result$x[, 8],
+                           PC9 = pca_result$x[, 9], PC10 = pca_result$x[, 10], PC11 = pca_result$x[, 11], PC12 = pca_result$x[, 12],
+                           PC13 = pca_result$x[, 13], PC14 = pca_result$x[, 14], PC15 = pca_result$x[, 15])
     
-    #return(pca_plot)
+    pca_plot <- ggplot(data = pca_data, aes(x = pca_data[, input$PCAX], y = pca_data[, input$PCAY])) +
+      geom_point() +
+      labs(title = title, x = paste("PC", input$PCAX), y = paste("PC", input$PCAY))
+    
+    return(pca_plot)
   }
   
     
@@ -308,40 +343,12 @@ server <- function(input, output) {
   
   })
   
-  #output$CPCA <- renderPlot({
+  output$CPCA <- renderPlot({
+    input$countsSubmit
+    isolate({plot_pca(c_file)})
     
-  #})
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+    
+  })
   
   
   #DIFF EXP   
@@ -411,11 +418,77 @@ server <- function(input, output) {
   
   
   
+  ## INDV GENE EXPRESSION
   
   
+  ind_read_counts <- reactive({
+    i_get_file <- input$icountMatrix$datapath
+    if(is.null(i_get_file)){ return() }
+    validate(
+      need(file_ext(input$icountMatrix$name) %in% c(
+        'text/csv',
+        'text/comma-separated-values',
+        'text/tab-separated-values',
+        'text/plain',
+        'csv',
+        'tsv'
+      ), "Wrong File Format try again!"))
+    read.table(i_get_file, header = TRUE, sep = ",")
+  })
   
+  ind_read_meta <- reactive({
+    i_get_file2 <- input$imetadata$datapath
+    if(is.null(i_get_file2)){ return() }
+    validate(
+      need(file_ext(input$imetadata$name) %in% c(
+        'text/csv',
+        'text/comma-separated-values',
+        'text/tab-separated-values',
+        'text/plain',
+        'csv',
+        'tsv'
+      ), "Wrong File Format try again!"))
+    read.table(i_get_file2, header = TRUE, sep = ",")
+  })
   
+  available_genes <- reactive({
+    req(ind_read_counts())
+    counts <- ind_read_counts()
+    geneSearch <- tolower(input$geneSearch)
+    gene_choices <- grep(geneSearch, colnames(counts), value = TRUE, ignore.case = TRUE)
+    return(gene_choices)
+  })
+  
+  # Update the gene choices dynamically based on the search term
+  observe({
+    updateTextInput(session, "geneSearch", value = "")
+    updateSelectInput(session, "selectedGene", choices = available_genes())
+  })
+  
+  # Reactive expression to filter metadata based on the selected gene
+  selected_gene_meta <- reactive({
+    req(ind_read_meta(), input$metacategory, input$selectedGene)
+    meta <- ind_read_meta()
+    gene_col <- input$selectedGene
+    meta %>%
+      filter(!is.na(get(input$metacategory))) %>%
+      select(get(input$metacategory), gene_col)
+  })
+  
+  # Render the selected plot type (bar or scatter)
+  output$IndGeneScatPlot <- renderPlot({
+    req(selected_gene_meta(), input$metacategory, input$selectedGene)
     
+    # Scatter plot
+    ggplot(selected_gene_meta(), aes(x = !!sym(input$metacategory), y = !!sym(input$selectedGene))) +
+      geom_point() +
+      labs(title = paste("Scatterplot for", input$selectedGene),
+           x = input$metacategory, y = input$selectedGene)
+  })
+  
+  
+  
+  
 }
 
 # Run the application 
