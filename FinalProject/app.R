@@ -137,9 +137,7 @@ server <- function(input, output, session) {
   })
   # outputs a table of the metadata into the Samples > Metadata tab 
   output$Stable <- renderDT({
-    #browser()
     file <- sample_load_data()
-    print(file)
   })
   # outputs a summary table of the metadata into the Samples > Summary tab
   output$Ssummary <- renderDT({
@@ -177,7 +175,6 @@ server <- function(input, output, session) {
   
   #COUNTS
   counts_load_data <- eventReactive({input$countsFile}, {
-    #browser()
     get_file <- input$countsFile$datapath
     if(is.null(get_file)){ return() }
     validate(
@@ -197,7 +194,6 @@ server <- function(input, output, session) {
   filter_zero_var_genes <- function(verse_counts, button_variance, button_nonzero, num_samples, num_genes) {
     # Compute variance for each gene
     variance <- apply(verse_counts[, -1], 1, var)
-    #browser()
     
     req_perc <- quantile(variance, button_variance/100)
     
@@ -255,7 +251,6 @@ server <- function(input, output, session) {
   }
   
   plot_zeros_vs_median <- function(data, title="Plot of Median vs Number of Non-Zero genes") {
-    #browser()
     median_val <- apply(data[,-1], 1, median, na.rm = TRUE)
     # Count the number of zeros in each row
     num_zeros <- rowSums(data[,-1] == 0, na.rm = TRUE)
@@ -280,7 +275,6 @@ server <- function(input, output, session) {
   
   
   counts_heatmap <- function(data, filtered_counts, button_variance, button_nonzero) {
-    #browser()
     subset_counts <- filtered_counts[,-1]
     counts_matrix <- as.matrix(subset_counts)
     counts_matrix_log <- log2(counts_matrix + 1)
@@ -289,10 +283,7 @@ server <- function(input, output, session) {
   }
   
   plot_pca <- function(c_data, title="") {
-    #browser()
     counts_no_gene <- c_data[,-1]
-    #vector_variance <- apply(data[,-1], 1, var, na.rm = TRUE)
-    #req_perc <- quantile(vector_variance, input$countsVariance/100)
     
     pca_result <- prcomp(t(counts_no_gene), center = TRUE)
     
@@ -309,8 +300,6 @@ server <- function(input, output, session) {
   }
   
     
-    
-    
   # Summary table
   output$Csummary <- renderDT({
     input$countsSubmit
@@ -324,14 +313,12 @@ server <- function(input, output, session) {
   # Diagnostic plot
   output$CDiagplot1 <- renderPlot({
     input$countsSubmit
-    #isolate({filtered_counts <- filter_zero_var_genes(c_file, input$countsVariance, input$countsNonzero)})
     isolate({plot_variance_vs_median(c_file)})
     
   })
   # Diagnostic plot
   output$CDiagplot2 <- renderPlot({
     input$countsSubmit
-    #isolate({filtered_counts <- filter_zero_var_genes(c_file, input$countsVariance, input$countsNonzero)})
     isolate({plot_zeros_vs_median(c_file)})
     
   })
@@ -353,7 +340,7 @@ server <- function(input, output, session) {
   
   
   #DIFF EXP   
-  # # loads in the diff expression data for use in the Diff. Expr. tab
+  # loads in the diff expression data for use in the Diff. Expr. tab
   diff_load_data <- reactive({
     d_get_file <- input$DiffFile$datapath
     if(is.null(d_get_file)){ return() }
@@ -375,7 +362,6 @@ server <- function(input, output, session) {
   })
   
   
-  #browser()
   # ggplot object of a volcano plot
   volcano_plot <- function(dataf, x_name, y_name, slider, color1, color2) {
     ggplot_out <- ggplot(dataf, aes(x = !!sym(x_name), y = -log10(!!sym(y_name)), color = (padj < 1 * 10^slider))) +
@@ -391,10 +377,6 @@ server <- function(input, output, session) {
     return(ggplot_out)
   }
   
-  #' Draw and filter table
-  #' @return Data frame filtered to p-adjusted values that are less than 
-  #' 1 * 10^slider, columns for p-value and p-adjusted value have more digits 
-  #' displayed.
   draw_table <- function(dataf, slider) {
     filtered_df <- dataf %>%
       filter(padj < 1 * 10^slider)
@@ -411,7 +393,6 @@ server <- function(input, output, session) {
   })
   # outputs a filtered table of the results into the Diff. Expr > Plots table tab
   output$DPlottable <- renderDT({
-    #browser()
     input$DiffSubmit
     isolate({draw_table(d_file3, input$DiffPadj_coloring)})
     
@@ -446,13 +427,7 @@ server <- function(input, output, session) {
     
     return(merged_data)
 }
-  
-  
-  
-  ## Allow the use to select values from merged data,
-  ## then based on the UI input values we can create a dataframe with just those two columns
-  ## 
-  
+
 
   output$IndGeneScatPlot <- renderPlot({
       req(input$geneSubmit)
