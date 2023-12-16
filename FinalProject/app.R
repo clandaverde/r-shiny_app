@@ -100,8 +100,9 @@ ui <- fluidPage(
                                                                                                       'text/tab-separated-values','text/plain', 'csv','tsv')),
                      fileInput("imetadata", paste0("Load sample information matrix CSV"), accept = c('text/csv', 'text/comma-separated-values',
                                                                                                    'text/tab-separated-values','text/plain', 'csv','tsv')),
-                     selectInput("metacategory", "Select metadata category", choices = c("Sample.ID", "PMI", "Age.of.Death", "RIN", 'mRNA.Seq.reads')),
-                     textInput("geneSearch", "Enter a gene to search for. (ex. ENSG00000000419.8 or )")
+                     selectInput("metacategory", "Select metadata category", choices = c("PMI", "Age.of.Death", "RIN", 'mRNA.Seq.reads')),
+                     textInput("geneSearch", "Enter a gene to search for. (ex. ENSG00000000419.8 or )", value =""),
+                     actionButton("geneSubmit", "display", icon("star"))
                    ),
                    
                    mainPanel(
@@ -420,74 +421,53 @@ server <- function(input, output, session) {
   
   ## INDV GENE EXPRESSION
   
-  
-  ind_read_counts <- reactive({
-    i_get_file <- input$icountMatrix$datapath
-    if(is.null(i_get_file)){ return() }
-    validate(
-      need(file_ext(input$icountMatrix$name) %in% c(
-        'text/csv',
-        'text/comma-separated-values',
-        'text/tab-separated-values',
-        'text/plain',
-        'csv',
-        'tsv'
-      ), "Wrong File Format try again!"))
-    read.table(i_get_file, header = TRUE, sep = ",")
+  # read counts matrix
+  counts_data <- reactive({
+    req(input$icountMatrix)
+    read.csv(input$icountMatrix$datapath)
   })
   
-  ind_read_meta <- reactive({
-    i_get_file2 <- input$imetadata$datapath
-    if(is.null(i_get_file2)){ return() }
-    validate(
-      need(file_ext(input$imetadata$name) %in% c(
-        'text/csv',
-        'text/comma-separated-values',
-        'text/tab-separated-values',
-        'text/plain',
-        'csv',
-        'tsv'
-      ), "Wrong File Format try again!"))
-    read.table(i_get_file2, header = TRUE, sep = ",")
+  sample_data <- reactive({
+    req(input$imetadata)
+    read.csv(input$imetadata$datapath)
   })
   
-  available_genes <- reactive({
-    req(ind_read_counts())
-    counts <- ind_read_counts()
-    geneSearch <- tolower(input$geneSearch)
-    gene_choices <- grep(geneSearch, colnames(counts), value = TRUE, ignore.case = TRUE)
-    return(gene_choices)
-  })
-  
-  # Update the gene choices dynamically based on the search term
-  observe({
-    updateTextInput(session, "geneSearch", value = "")
-    updateSelectInput(session, "selectedGene", choices = available_genes())
-  })
-  
-  # Reactive expression to filter metadata based on the selected gene
-  selected_gene_meta <- reactive({
-    req(ind_read_meta(), input$metacategory, input$selectedGene)
-    meta <- ind_read_meta()
-    gene_col <- input$selectedGene
-    meta %>%
-      filter(!is.na(get(input$metacategory))) %>%
-      select(get(input$metacategory), gene_col)
-  })
-  
-  # Render the selected plot type (bar or scatter)
-  output$IndGeneScatPlot <- renderPlot({
-    req(selected_gene_meta(), input$metacategory, input$selectedGene)
+  combined <- function() {
+    counts <- counts_data()
+    transposed_row <- data.frame(t(counts[-1]))  # Exclude the first column if it's an identifier
+    names(transposed_row) <- counts$X
     
-    # Scatter plot
-    ggplot(selected_gene_meta(), aes(x = !!sym(input$metacategory), y = !!sym(input$selectedGene))) +
-      geom_point() +
-      labs(title = paste("Scatterplot for", input$selectedGene),
-           x = input$metacategory, y = input$selectedGene)
-  })
+    sample <- sample_data()
+  
+    merged_data <- merge(sample, transposed_row, by.x = "Sample.ID", by.y = "row.names", all.x = TRUE)
+    
+    rownames(merged_data) <- merged_data$Sample.ID
+    merged_data <- merged_data[, -1]
+    
+    return(merged_data)
+}
   
   
   
+  ## Allow the use to select values from merged data,
+  ## then based on the UI input values we can create a dataframe with just those two columns
+  ## 
+  
+
+  output$IndGeneScatPlot <- renderPlot({
+      req(input$geneSubmit)
+      
+      merged_data <- combined()
+      
+      selected_gene <- input$geneSearch
+      selected_gene_data <- merged_data[, grepl(selected_gene, names(merged_data))]
+      
+      req(input$metacategory %in% colnames(merged_data))
+      
+      plot_title <- paste("Scatter Plot of", selected_gene, "vs.", input$metacategory)
+      plot(x = merged_data[[input$metacategory]], y = selected_gene_data, 
+           xlab = input$metacategory, ylab = selected_gene, main = plot_title)
+    })
   
 }
 
