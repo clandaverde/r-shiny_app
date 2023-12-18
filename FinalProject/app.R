@@ -101,7 +101,7 @@ ui <- fluidPage(
                      fileInput("imetadata", paste0("Load sample information matrix CSV"), accept = c('text/csv', 'text/comma-separated-values',
                                                                                                    'text/tab-separated-values','text/plain', 'csv','tsv')),
                      selectInput("metacategory", "Select metadata category", choices = c("PMI", "Age.of.Death", "RIN", 'mRNA.Seq.reads')),
-                     textInput("geneSearch", "Enter a gene to search for. (ex. ENSG00000000419.8 or )", value =""),
+                     textInput("geneSearch", "Enter a gene to search for. (ex. ENSG00000000419.8)", value =""),
                      actionButton("geneSubmit", "display", icon("star"))
                    ),
                    
